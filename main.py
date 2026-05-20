@@ -66,7 +66,7 @@ async def update(interaction: discord.Interaction, version: str, title: str, det
     formatted_details = details.replace("\\n", "\n")
     
     embed = discord.Embed(
-        title=f"🚀 Game Update: {version} - {title}",
+        title=f"DeadZone : {version} - {title} Update",
         description=formatted_details,
         color=discord.Color.gold()
     )
