@@ -85,4 +85,4 @@ keep_alive()
 
 # แนะนำให้ใส่ Token ใน Environment Variable ของ Render (ดูวิธีทำด้านล่าง)
 # หรือถ้าต้องการใส่ตรงนี้ ให้เปลี่ยนข้อความด้านล่างเป็น Token ของคุณ
-bot.run(os.environ.get('DISCORD_TOKEN', 'ใส่_TOKEN_อันใหม่_ตรงนี้'))
+bot.run(os.environ.get('DISCORD_TOKEN', 'MTQ5NTMzODExMDMwNzkzMDE5Mg.G8Cwrg.q-YYAyoHeD9d_r8b049F39cBu6-S5mAKiS4r-A'))
