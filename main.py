@@ -66,7 +66,7 @@ async def update(interaction: discord.Interaction, version: str, title: str, det
     formatted_details = details.replace("\\n", "\n")
     
     embed = discord.Embed(
-        title=f"DeadZone : {version} Update - {title}",
+        title=f"DeadZone : {version} - {title}",
         description=formatted_details,
         color=discord.Color.gold()
     )
@@ -92,7 +92,7 @@ async def showcase(interaction: discord.Interaction, asset_name: str, descriptio
     formatted_desc = description.replace("\\n", "\n")
     
     embed = discord.Embed(
-        title=f"✨ CONTENT SHOWCASE: {asset_name} ✨",
+        title=f"{asset_name}",
         description=formatted_desc,
         color=discord.Color.purple()
     )
@@ -103,7 +103,7 @@ async def showcase(interaction: discord.Interaction, asset_name: str, descriptio
         if any(ext in media_url.lower() for ext in [".png", ".jpg", ".jpeg", ".gif"]):
             embed.set_image(url=media_url)
         else:
-            embed.add_field(name="🎬 Watch / View Full Content", value=media_url, inline=False)
+            embed.add_field(name="Image", value=media_url, inline=False)
             
     await interaction.response.send_message("Showcase posted!", ephemeral=True)
     await interaction.channel.send(embed=embed)
