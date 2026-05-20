@@ -1,0 +1,88 @@
+import os
+import random
+import discord
+from discord.ext import commands
+from flask import Flask
+from threading import Thread
+
+# ========================================================
+# ระบบเว็บเซิร์ฟเวอร์สำหรับหลอก Render (Keep Alive)
+# ========================================================
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "บอทของคุณกำลังทำงานออนไลน์อยู่ 24/7!"
+
+def run_web():
+    # Render จะบังคับให้ใช้พอร์ต 10000 เป็นค่าเริ่มต้นหรือกำหนดผ่าน PORT env
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
+
+# ========================================================
+# ระบบ Discord Bot
+# ========================================================
+intents = discord.Intents.default()
+intents.message_content = True  
+intents.members = True          
+
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f'=================================')
+    print(f'บอท {bot.user} ออนไลน์บน Render สำเร็จแล้ว!')
+    print(f'=================================')
+
+@bot.command()
+async def ping(ctx):
+    latency = round(bot.latency * 1000)
+    await ctx.send(f"Pong! 📱 (ความเร็ว: {latency}ms)")
+
+@bot.command()
+async def say(ctx, *, text):
+    await ctx.message.delete()
+    await ctx.send(text)
+
+@bot.command()
+async def roll(ctx):
+    number = random.randint(1, 100)
+    await ctx.send(f"🎲 ผลการสุ่มเลข (1-100): **{number}**")
+
+@bot.command()
+async def userinfo(ctx):
+    user = ctx.author
+    embed = discord.Embed(title=f"ข้อมูลของ {user.name}", color=discord.Color.blue())
+    embed.set_thumbnail(url=user.display_avatar.url)
+    embed.add_field(name="ชื่อในระบบ", value=user.mention, inline=True)
+    embed.add_field(name="วันที่สร้างบัญชี", value=user.created_at.strftime("%d/%m/%Y"), inline=True)
+    await ctx.send(embed=embed)
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clean(ctx, amount: int):
+    await ctx.channel.purge(limit=amount + 1)
+    await ctx.send(f"🧹 ลบข้อความเรียบร้อยแล้ว {amount} ข้อความ!", delete_after=5)
+
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason=None):
+    await member.kick(reason=reason)
+    await ctx.send(f"🚪 เตะ {member.mention} สำเร็จ! เหตุผล: {reason}")
+
+@clean.error
+@kick.error
+async def permission_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ คุณไม่มีสิทธิ์ใช้งานคำสั่งนี้ครับ!")
+
+# รันระบบเว็บหลอกก่อน แล้วค่อยรันบอทดิสคอร์ด
+keep_alive()
+
+# แนะนำให้ใส่ Token ใน Environment Variable ของ Render (ดูวิธีทำด้านล่าง)
+# หรือถ้าต้องการใส่ตรงนี้ ให้เปลี่ยนข้อความด้านล่างเป็น Token ของคุณ
+bot.run(os.environ.get('DISCORD_TOKEN', 'ใส่_TOKEN_อันใหม่_ตรงนี้'))
