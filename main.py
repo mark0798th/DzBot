@@ -83,5 +83,5 @@ async def permission_error(ctx, error):
 keep_alive()
 
 # ใส่ Token บอทของคุณที่นี่ตรงๆ เพื่อให้รันผ่านมือถือได้ทันที
-TOKEN = "MTQ5NTMzODExMDMwNzkzMDE5Mg.G8Cwrg.q-YYAyoHeD9d_r8b049F39cBu6-S5mAKiS4r-A"
+TOKEN = "MTQ5NTMzODExMDMwNzkzMDE5Mg.GB01Vz.OMsi8JEYYTt41R-xo6BqtqtRR1Wp2CEZ8WGu6Q"
 bot.run(TOKEN)
