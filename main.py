@@ -3,6 +3,7 @@ import random
 import discord
 from discord.ext import commands
 from flask import Flask
+from threading import Thread
 
 # ========================================================
 # ระบบเว็บเซิร์ฟเวอร์สำหรับหลอก Render (Keep Alive)
@@ -12,6 +13,14 @@ app = Flask('')
 @app.route('/')
 def home():
     return "บอทของคุณกำลังทำงานออนไลน์อยู่ 24/7!"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_web)
+    t.start()
 
 # ========================================================
 # ระบบ Discord Bot
@@ -70,11 +79,9 @@ async def permission_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ คุณไม่มีสิทธิ์ใช้งานคำสั่งนี้ครับ!")
 
-# รันบอทโดยดึงค่า TOKEN จาก Environment Variable ของ Render เท่านั้น เพื่อความปลอดภัย
-# (ห้ามนำ Token มาวางตรงนี้เด็ดขาด ให้ทำตามขั้นตอนการตั้งค่าหน้าเว็บ Render ด้านล่าง)
-TOKEN = os.environ.get('DISCORD_TOKEN')
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("❌ ตรวจไม่พบ DISCORD_TOKEN ในหน้า Environment ของ Render กรุณาเช็กการตั้งค่า!")
-    
+# เปิดใช้ระบบเว็บหลอกเบื้องหลัง
+keep_alive()
+
+# ใส่ Token บอทของคุณที่นี่ตรงๆ เพื่อให้รันผ่านมือถือได้ทันที
+TOKEN = "MTQ5NTMzODExMDMwNzkzMDE5Mg.G8Cwrg.q-YYAyoHeD9d_r8b049F39cBu6-S5mAKiS4r-A"
+bot.run(TOKEN)
