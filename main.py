@@ -6,7 +6,7 @@ from flask import Flask
 from threading import Thread
 
 # ========================================================
-# ระบบเว็บเซิร์ฟเวอร์สำหรับหลอก Render (Keep Alive)
+# ระบบเว็บเซิร์ฟเวอร์สำหรับหลอก Render (Keep Alive แบบเปิดคู่กัน)
 # ========================================================
 app = Flask('')
 
@@ -15,10 +15,12 @@ def home():
     return "บอทของคุณกำลังทำงานออนไลน์อยู่ 24/7!"
 
 def run_web():
+    # ดึงค่าพอร์ตที่ Render กำหนดมาให้ (ปกติคือพอร์ต 10000)
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
+    # แยกกระบวนการไปรันเว็บเซิร์ฟเวอร์หลอกที่เบื้องหลัง ไม่ให้กวนบอทดิสคอร์ด
     t = Thread(target=run_web)
     t.start()
 
@@ -82,6 +84,9 @@ async def permission_error(ctx, error):
 # เปิดใช้ระบบเว็บหลอกเบื้องหลัง
 keep_alive()
 
-# ใส่ Token บอทของคุณที่นี่ตรงๆ เพื่อให้รันผ่านมือถือได้ทันที
-TOKEN = "MTQ5NTMzODExMDMwNzkzMDE5Mg.GB01Vz.OMsi8JEYYTt41R-xo6BqtqtRR1Wp2CEZ8WGu6Q"
-bot.run(TOKEN)
+# ดึงค่า TOKEN จาก Environment Variable ของ Render
+TOKEN = os.environ.get('DISCORD_TOKEN')
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("❌ ตรวจไม่พบ DISCORD_TOKEN ในหน้า Environment ของ Render กรุณาเช็กการตั้งค่า!")
