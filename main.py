@@ -3,7 +3,6 @@ import random
 import discord
 from discord.ext import commands
 from flask import Flask
-from threading import Thread
 
 # ========================================================
 # ระบบเว็บเซิร์ฟเวอร์สำหรับหลอก Render (Keep Alive)
@@ -14,21 +13,12 @@ app = Flask('')
 def home():
     return "บอทของคุณกำลังทำงานออนไลน์อยู่ 24/7!"
 
-def run_web():
-    # Render จะบังคับให้ใช้พอร์ต 10000 เป็นค่าเริ่มต้นหรือกำหนดผ่าน PORT env
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    t = Thread(target=run_web)
-    t.start()
-
 # ========================================================
 # ระบบ Discord Bot
 # ========================================================
 intents = discord.Intents.default()
-intents.message_content = True  
-intents.members = True          
+intents.message_content = True  # สิทธิ์อ่านข้อความคำสั่ง
+intents.members = True          # สิทธิ์ตรวจสอบสมาชิก
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -80,9 +70,11 @@ async def permission_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ คุณไม่มีสิทธิ์ใช้งานคำสั่งนี้ครับ!")
 
-# รันระบบเว็บหลอกก่อน แล้วค่อยรันบอทดิสคอร์ด
-keep_alive()
-
-# แนะนำให้ใส่ Token ใน Environment Variable ของ Render (ดูวิธีทำด้านล่าง)
-# หรือถ้าต้องการใส่ตรงนี้ ให้เปลี่ยนข้อความด้านล่างเป็น Token ของคุณ
-bot.run(os.environ.get('DISCORD_TOKEN', 'MTQ5NTMzODExMDMwNzkzMDE5Mg.G8Cwrg.q-YYAyoHeD9d_r8b049F39cBu6-S5mAKiS4r-A'))
+# รันบอทโดยดึงค่า TOKEN จาก Environment Variable ของ Render เท่านั้น เพื่อความปลอดภัย
+# (ห้ามนำ Token มาวางตรงนี้เด็ดขาด ให้ทำตามขั้นตอนการตั้งค่าหน้าเว็บ Render ด้านล่าง)
+TOKEN = os.environ.get('DISCORD_TOKEN')
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("❌ ตรวจไม่พบ DISCORD_TOKEN ในหน้า Environment ของ Render กรุณาเช็กการตั้งค่า!")
+    
