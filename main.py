@@ -129,7 +129,7 @@ async def status(interaction: discord.Interaction, state: app_commands.Choice[st
     }
     
     embed = discord.Embed(
-        title="🎮 Game Server Status Report",
+        title="Addon Status Report",
         description=f"Current State: **{state.name}**\n\n**Details:**\n{message}",
         color=color_map.get(state.value, discord.Color.light_grey())
     )
