@@ -1,92 +1,118 @@
 import os
 import random
 import discord
-from discord.ext import commands
+from discord import app_commands
 from flask import Flask
 from threading import Thread
 
 # ========================================================
-# ระบบเว็บเซิร์ฟเวอร์สำหรับหลอก Render (Keep Alive แบบเปิดคู่กัน)
+# Web Server for Render Keep-Alive (24/7)
 # ========================================================
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "บอทของคุณกำลังทำงานออนไลน์อยู่ 24/7!"
+    return "Your bot is running 24/7 online!"
 
 def run_web():
-    # ดึงค่าพอร์ตที่ Render กำหนดมาให้ (ปกติคือพอร์ต 10000)
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
-    # แยกกระบวนการไปรันเว็บเซิร์ฟเวอร์หลอกที่เบื้องหลัง ไม่ให้กวนบอทดิสคอร์ด
     t = Thread(target=run_web)
     t.start()
 
 # ========================================================
-# ระบบ Discord Bot
+# Discord Slash Bot Setup
 # ========================================================
-intents = discord.Intents.default()
-intents.message_content = True  # สิทธิ์อ่านข้อความคำสั่ง
-intents.members = True          # สิทธิ์ตรวจสอบสมาชิก
+class MyBot(discord.Client):
+    def __init__(self):
+        # Set required intents
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.members = True
+        
+        super().__init__(intents=intents)
+        # Create Command Tree for Slash Commands
+        self.tree = app_commands.CommandTree(self)
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+    async def setup_hook(self):
+        # Sync slash commands globally across all servers
+        await self.tree.sync()
+        print("Slash commands synced globally!")
+
+bot = MyBot()
 
 @bot.event
 async def on_ready():
     print(f'=================================')
-    print(f'บอท {bot.user} ออนไลน์บน Render สำเร็จแล้ว!')
+    print(f'Logged in as {bot.user}')
+    print(f'Bot is ready on Render 24/7!')
     print(f'=================================')
 
-@bot.command()
-async def ping(ctx):
+# ========================================================
+# Slash Commands with Descriptions
+# ========================================================
+
+# 1. /ping Command
+@bot.tree.command(name="ping", description="Check the bot's response speed latency")
+async def ping(interaction: discord.Interaction):
     latency = round(bot.latency * 1000)
-    await ctx.send(f"Pong! 📱 (ความเร็ว: {latency}ms)")
+    await interaction.response.send_message(f"Pong! 📱 (Latency: {latency}ms)")
 
-@bot.command()
-async def say(ctx, *, text):
-    await ctx.message.delete()
-    await ctx.send(text)
+# 2. /say Command
+@bot.tree.command(name="say", description="Make the bot repeat a message sent by you")
+@app_commands.describe(text="The message you want the bot to say")
+async def say(interaction: discord.Interaction, text: str):
+    # Reply silently to the sender, then send the message to the channel
+    await interaction.response.send_message("Message sent!", ephemeral=True)
+    await interaction.channel.send(text)
 
-@bot.command()
-async def roll(ctx):
+# 3. /roll Command
+@bot.tree.command(name="roll", description="Roll a random number between 1 and 100")
+async def roll(interaction: discord.Interaction):
     number = random.randint(1, 100)
-    await ctx.send(f"🎲 ผลการสุ่มเลข (1-100): **{number}**")
+    await interaction.response.send_message(f"🎲 Random Number Result (1-100): **{number}**")
 
-@bot.command()
-async def userinfo(ctx):
-    user = ctx.author
-    embed = discord.Embed(title=f"ข้อมูลของ {user.name}", color=discord.Color.blue())
+# 4. /userinfo Command
+@bot.tree.command(name="userinfo", description="Display your server profile information card")
+async def userinfo(interaction: discord.Interaction):
+    user = interaction.user
+    embed = discord.Embed(title=f"User Info: {user.name}", color=discord.Color.blue())
     embed.set_thumbnail(url=user.display_avatar.url)
-    embed.add_field(name="ชื่อในระบบ", value=user.mention, inline=True)
-    embed.add_field(name="วันที่สร้างบัญชี", value=user.created_at.strftime("%d/%m/%Y"), inline=True)
-    await ctx.send(embed=embed)
+    embed.add_field(name="Username", value=user.mention, inline=True)
+    embed.add_field(name="Account Created At", value=user.created_at.strftime("%d/%m/%Y"), inline=True)
+    await interaction.response.send_message(embed=embed)
 
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def clean(ctx, amount: int):
-    await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f"🧹 ลบข้อความเรียบร้อยแล้ว {amount} ข้อความ!", delete_after=5)
+# 5. /clean Command (Requires Manage Messages Permission)
+@bot.tree.command(name="clean", description="Bulk delete messages in this channel quickly")
+@app_commands.describe(amount="Number of messages to delete")
+@app_commands.checks.has_permissions(manage_messages=True)
+async def clean(interaction: discord.Interaction, amount: int):
+    await interaction.response.send_message(f"🧹 Clearing {amount} messages...", ephemeral=True)
+    await interaction.channel.purge(limit=amount)
 
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason=None):
+# 6. /kick Command (Requires Kick Members Permission)
+@bot.tree.command(name="kick", description="Kick a member from this server")
+@app_commands.describe(member="The member to kick", reason="The reason for kicking")
+@app_commands.checks.has_permissions(kick_members=True)
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = None):
     await member.kick(reason=reason)
-    await ctx.send(f"🚪 เตะ {member.mention} สำเร็จ! เหตุผล: {reason}")
+    await interaction.response.send_message(f"🚪 Successfully kicked {member.name}! Reason: {reason}")
 
+# Error handler for missing permissions on Admin commands
 @clean.error
 @kick.error
-async def permission_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ คุณไม่มีสิทธิ์ใช้งานคำสั่งนี้ครับ!")
+async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message("❌ You do not have permission to use this command!", ephemeral=True)
 
-# เปิดใช้ระบบเว็บหลอกเบื้องหลัง
+# Run Web Server first
 keep_alive()
 
-# ดึงค่า TOKEN จาก Environment Variable ของ Render
+# Run the bot using the Token from Render Environment
 TOKEN = os.environ.get('DISCORD_TOKEN')
 if TOKEN:
     bot.run(TOKEN)
 else:
-    print("❌ ตรวจไม่พบ DISCORD_TOKEN ในหน้า Environment ของ Render กรุณาเช็กการตั้งค่า!")
+    print("❌ DISCORD_TOKEN not found in Render Environment variables!")
