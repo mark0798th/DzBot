@@ -90,6 +90,66 @@ async def on_ready():
     )
 
 # =========================================================
+# DEVLOG COMMAND
+# =========================================================
+@bot.tree.command(name="devlog", description="Post development progress or changes")
+@app_commands.describe(
+    category="Type of development update",
+    title="Headline of the update",
+    details="What was changed, fixed, or added",
+    image_url="Optional image URL"
+)
+@app_commands.choices(category=[
+    app_commands.Choice(name="Bug Fixes", value="fix"),
+    app_commands.Choice(name="New Features", value="feature"),
+    app_commands.Choice(name="Balancing", value="balance"),
+    app_commands.Choice(name="Optimization", value="optimization"),
+    app_commands.Choice(name="Rework", value="rework"),
+    app_commands.Choice(name="AI Improvements", value="ai"),
+    app_commands.Choice(name="Systems Update", value="systems"),
+    app_commands.Choice(name="Experimental", value="experimental")
+])
+@app_commands.checks.has_permissions(manage_messages=True)
+async def devlog(
+    interaction: discord.Interaction,
+    category: app_commands.Choice[str],
+    title: str,
+    details: str,
+    image_url: str = None
+):
+    color_map = {
+        "fix": discord.Color.from_rgb(87, 242, 135),
+        "feature": discord.Color.from_rgb(88, 101, 242),
+        "balance": discord.Color.from_rgb(255, 201, 107),
+        "optimization": discord.Color.from_rgb(67, 181, 129),
+        "rework": discord.Color.from_rgb(255, 140, 70),
+        "ai": discord.Color.from_rgb(240, 71, 71),
+        "systems": discord.Color.from_rgb(180, 120, 255),
+        "experimental": discord.Color.from_rgb(88, 210, 200)
+    }
+
+    embed = discord.Embed(
+        title=title,
+        description=details.replace("\\n", "\n"),
+        color=color_map[category.value]
+    )
+
+    embed.add_field(name="Category", value=category.name, inline=True)
+    embed.add_field(name="Project", value="DeadZone", inline=True)
+    embed.add_field(name="Status", value="In Development", inline=True)
+
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+
+    if image_url and image_url.startswith("http"):
+        embed.set_image(url=image_url)
+
+    embed.set_footer(text=f"Development log by {interaction.user.name}")
+    embed.timestamp = discord.utils.utcnow()
+
+    await interaction.response.send_message("Development log published successfully.", ephemeral=True)
+    await interaction.channel.send(embed=embed)
+
+# =========================================================
 # UPDATE COMMAND
 # =========================================================
 @bot.tree.command(name="update", description="Publish development updates")
