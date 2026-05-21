@@ -226,23 +226,8 @@ async def status(interaction: discord.Interaction, state: app_commands.Choice[st
     role_3="Third role to ping"
 )
 @app_commands.checks.has_permissions(manage_guild=True)
-async def rules(
-    interaction: discord.Interaction,
-    title: str,
-    rules: str,
-    role_1: discord.Role = None,
-    role_2: discord.Role = None,
-    role_3: discord.Role = None
-):
-    embed = discord.Embed(
-        title=title,
-        description=rules.replace("\\n", "\n"),
-        color=COLORS["rules"]
-    )
-
-    embed.add_field(name="Server", value=interaction.guild.name, inline=True)
-    embed.add_field(name="Category", value="Community Rules", inline=True)
-    embed.add_field(name="Status", value="Active", inline=True)
+async def rules(interaction: discord.Interaction, title: str, rules: str, role_1: discord.Role = None, role_2: discord.Role = None, role_3: discord.Role = None):
+    embed = discord.Embed(title=title, description=rules.replace("\\n", "\n"), color=COLORS["rules"])
 
     if interaction.guild.icon:
         embed.set_thumbnail(url=interaction.guild.icon.url)
