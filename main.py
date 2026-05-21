@@ -322,6 +322,102 @@ async def status(
     await interaction.channel.send(embed=embed)
 
 # =========================================================
+# SERVER RULES COMMAND
+# =========================================================
+@bot.tree.command(
+    name="rules",
+    description="Publish or update the server rules"
+)
+@app_commands.describe(
+    title="Rules headline",
+    rules="Server rules (Use \\n for new lines)",
+    role_1="First role to ping",
+    role_2="Second role to ping",
+    role_3="Third role to ping"
+)
+@app_commands.checks.has_permissions(manage_guild=True)
+async def rules(
+    interaction: discord.Interaction,
+    title: str,
+    rules: str,
+    role_1: discord.Role = None,
+    role_2: discord.Role = None,
+    role_3: discord.Role = None
+):
+
+    formatted_rules = rules.replace("\\n", "\n")
+
+    embed = discord.Embed(
+        title=f"{title}",
+        description=formatted_rules,
+        color=discord.Color.from_rgb(88, 101, 242)
+    )
+
+    embed.add_field(
+        name="Server",
+        value=interaction.guild.name,
+        inline=True
+    )
+
+    embed.add_field(
+        name="Category",
+        value="Community Rules",
+        inline=True
+    )
+
+    embed.add_field(
+        name="Status",
+        value="Active",
+        inline=True
+    )
+
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
+
+    embed.set_footer(
+        text=f"Published by {interaction.user.name}"
+    )
+
+    embed.timestamp = discord.utils.utcnow()
+
+    # Role Pings
+    roles_to_ping = []
+
+    for role in [role_1, role_2, role_3]:
+        if role and role not in roles_to_ping:
+            roles_to_ping.append(role)
+
+    ping_message = " ".join(role.mention for role in roles_to_ping)
+
+    await interaction.response.send_message(
+        "Server rules published successfully.",
+        ephemeral=True
+    )
+
+    if ping_message:
+        await interaction.channel.send(
+            content=ping_message,
+            embed=embed
+        )
+    else:
+        await interaction.channel.send(embed=embed)
+
+# =========================================================
+# Add To Error Handler
+# =========================================================
+@rules.error
+async def rules_error(
+    interaction: discord.Interaction,
+    error: app_commands.AppCommandError
+):
+
+    if isinstance(error, app_commands.MissingPermissions):
+        await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True
+        )
+
+# =========================================================
 # Permission Error Handler
 # =========================================================
 @update.error
