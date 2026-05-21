@@ -14,8 +14,7 @@ def home():
     return "DeadZone Development Bot is running."
 
 def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
 def keep_alive():
     Thread(target=run_web).start()
@@ -30,7 +29,6 @@ class DeadZoneBot(discord.Client):
         intents.members = True
 
         super().__init__(intents=intents)
-
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
@@ -43,6 +41,35 @@ class DeadZoneBot(discord.Client):
         print("================================================")
 
 bot = DeadZoneBot()
+
+# =========================================================
+# Colors
+# =========================================================
+COLORS = {
+    "update": discord.Color.from_rgb(255, 170, 0),
+    "showcase": discord.Color.from_rgb(180, 120, 255),
+    "rules": discord.Color.from_rgb(88, 101, 242),
+    "active": discord.Color.from_rgb(67, 181, 129),
+    "working": discord.Color.from_rgb(255, 201, 107),
+    "rework": discord.Color.from_rgb(255, 140, 70),
+    "break": discord.Color.from_rgb(114, 137, 218),
+    "burnout": discord.Color.from_rgb(90, 90, 90),
+    "preparing": discord.Color.from_rgb(200, 130, 255),
+    "experimental": discord.Color.from_rgb(88, 210, 200),
+    "paused": discord.Color.from_rgb(240, 71, 71)
+}
+
+# =========================================================
+# Utility
+# =========================================================
+def get_ping_message(*roles):
+    valid_roles = []
+
+    for role in roles:
+        if role and role not in valid_roles:
+            valid_roles.append(role)
+
+    return " ".join(role.mention for role in valid_roles)
 
 # =========================================================
 # Ready Event
@@ -63,31 +90,12 @@ async def on_ready():
     )
 
 # =========================================================
-# Colors
-# =========================================================
-COLORS = {
-    "update": discord.Color.from_rgb(255, 170, 0),
-    "showcase": discord.Color.from_rgb(180, 120, 255),
-    "active": discord.Color.from_rgb(67, 181, 129),
-    "working": discord.Color.from_rgb(255, 201, 107),
-    "rework": discord.Color.from_rgb(255, 140, 70),
-    "break": discord.Color.from_rgb(114, 137, 218),
-    "burnout": discord.Color.from_rgb(90, 90, 90),
-    "preparing": discord.Color.from_rgb(200, 130, 255),
-    "experimental": discord.Color.from_rgb(88, 210, 200),
-    "paused": discord.Color.from_rgb(240, 71, 71)
-}
-
-# =========================================================
 # UPDATE COMMAND
 # =========================================================
-@bot.tree.command(
-    name="update",
-    description="Publish a development update or patch notes"
-)
+@bot.tree.command(name="update", description="Publish development updates")
 @app_commands.describe(
     version="Update version",
-    title="Headline for this update",
+    title="Update title",
     details="Patch notes or update details",
     image_url="Optional image URL",
     role_1="First role to ping",
@@ -105,78 +113,37 @@ async def update(
     role_2: discord.Role = None,
     role_3: discord.Role = None
 ):
-
-    formatted_details = details.replace("\\n", "\n")
-
     embed = discord.Embed(
         title=f"DeadZone Update {version}",
-        description=(
-            f"## {title}\n\n"
-            f"{formatted_details}"
-        ),
+        description=f"## {title}\n\n{details.replace('\\n', '\n')}",
         color=COLORS["update"]
     )
 
-    embed.add_field(
-        name="Build Version",
-        value=version,
-        inline=True
-    )
+    embed.add_field(name="Version", value=version, inline=True)
+    embed.add_field(name="Category", value="Patch Notes", inline=True)
+    embed.add_field(name="Status", value="Released", inline=True)
 
-    embed.add_field(
-        name="Category",
-        value="Patch Notes",
-        inline=True
-    )
-
-    embed.add_field(
-        name="Status",
-        value="Released",
-        inline=True
-    )
-
-    embed.set_thumbnail(
-        url=bot.user.display_avatar.url
-    )
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
 
     if image_url and image_url.startswith("http"):
         embed.set_image(url=image_url)
 
-    embed.set_footer(
-        text=f"Published by {interaction.user.name}"
-    )
-
+    embed.set_footer(text=f"Published by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
-    # Role Pings
-    roles_to_ping = []
+    ping_message = get_ping_message(role_1, role_2, role_3)
 
-    for role in [role_1, role_2, role_3]:
-        if role and role not in roles_to_ping:
-            roles_to_ping.append(role)
-
-    ping_message = " ".join(role.mention for role in roles_to_ping)
-
-    await interaction.response.send_message(
-        "Update announcement published successfully.",
-        ephemeral=True
-    )
+    await interaction.response.send_message("Update announcement published successfully.", ephemeral=True)
 
     if ping_message:
-        await interaction.channel.send(
-            content=ping_message,
-            embed=embed
-        )
+        await interaction.channel.send(content=ping_message, embed=embed)
     else:
         await interaction.channel.send(embed=embed)
 
 # =========================================================
 # SHOWCASE COMMAND
 # =========================================================
-@bot.tree.command(
-    name="showcase",
-    description="Showcase a new weapon, map, feature, or system"
-)
+@bot.tree.command(name="showcase", description="Showcase weapons, maps, systems, or features")
 @app_commands.describe(
     asset_name="Name of the showcased content",
     description="Showcase details",
@@ -189,76 +156,34 @@ async def showcase(
     description: str,
     media_url: str = None
 ):
-
-    formatted_description = description.replace("\\n", "\n")
-
     embed = discord.Embed(
         title=asset_name,
-        description=formatted_description,
+        description=description.replace("\\n", "\n"),
         color=COLORS["showcase"]
     )
 
-    embed.add_field(
-        name="Content Type",
-        value="Development Showcase",
-        inline=True
-    )
+    embed.add_field(name="Type", value="Development Showcase", inline=True)
+    embed.add_field(name="Project", value="DeadZone", inline=True)
+    embed.add_field(name="Visibility", value="Public Preview", inline=True)
 
-    embed.add_field(
-        name="Project",
-        value="DeadZone",
-        inline=True
-    )
-
-    embed.add_field(
-        name="Visibility",
-        value="Public Preview",
-        inline=True
-    )
-
-    embed.set_thumbnail(
-        url=bot.user.display_avatar.url
-    )
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
 
     if media_url and media_url.startswith("http"):
-        if any(ext in media_url.lower() for ext in [
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".gif",
-            ".webp"
-        ]):
-            embed.set_image(url=media_url)
-        else:
-            embed.add_field(
-                name="Media Link",
-                value=media_url,
-                inline=False
-            )
+        embed.set_image(url=media_url)
 
-    embed.set_footer(
-        text=f"Showcased by {interaction.user.name}"
-    )
-
+    embed.set_footer(text=f"Showcased by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
-    await interaction.response.send_message(
-        "Showcase published successfully.",
-        ephemeral=True
-    )
-
+    await interaction.response.send_message("Showcase published successfully.", ephemeral=True)
     await interaction.channel.send(embed=embed)
 
 # =========================================================
-# DEVELOPMENT STATUS COMMAND
+# STATUS COMMAND
 # =========================================================
-@bot.tree.command(
-    name="status",
-    description="Update the current development status"
-)
+@bot.tree.command(name="status", description="Update development status")
 @app_commands.describe(
     state="Current development state",
-    message="Additional developer notes"
+    message="Developer notes"
 )
 @app_commands.choices(state=[
     app_commands.Choice(name="Active Development", value="active"),
@@ -271,66 +196,31 @@ async def showcase(
     app_commands.Choice(name="Development Paused", value="paused")
 ])
 @app_commands.checks.has_permissions(manage_messages=True)
-async def status(
-    interaction: discord.Interaction,
-    state: app_commands.Choice[str],
-    message: str = "No additional details."
-):
-
+async def status(interaction: discord.Interaction, state: app_commands.Choice[str], message: str):
     embed = discord.Embed(
         title="DeadZone Development Status",
-        description=(
-            f"## {state.name}\n\n"
-            f"{message}"
-        ),
-        color=COLORS.get(state.value)
+        description=f"## {state.name}\n\n{message}",
+        color=COLORS[state.value]
     )
 
-    embed.add_field(
-        name="Project",
-        value="DeadZone",
-        inline=True
-    )
+    embed.add_field(name="Project", value="DeadZone", inline=True)
+    embed.add_field(name="Current Activity", value=state.name, inline=True)
+    embed.add_field(name="Team Status", value="Monitoring", inline=True)
 
-    embed.add_field(
-        name="Current Activity",
-        value=state.name,
-        inline=True
-    )
-
-    embed.add_field(
-        name="Team Status",
-        value="Monitoring",
-        inline=True
-    )
-
-    embed.set_thumbnail(
-        url=bot.user.display_avatar.url
-    )
-
-    embed.set_footer(
-        text=f"Updated by {interaction.user.name}"
-    )
-
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    embed.set_footer(text=f"Updated by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
-    await interaction.response.send_message(
-        "Development status updated successfully.",
-        ephemeral=True
-    )
-
+    await interaction.response.send_message("Development status updated successfully.", ephemeral=True)
     await interaction.channel.send(embed=embed)
 
 # =========================================================
-# SERVER RULES COMMAND
+# RULES COMMAND
 # =========================================================
-@bot.tree.command(
-    name="rules",
-    description="Publish or update the server rules"
-)
+@bot.tree.command(name="rules", description="Publish server rules")
 @app_commands.describe(
-    title="Rules headline",
-    rules="Server rules (Use \\n for new lines)",
+    title="Rules title",
+    rules="Server rules",
     role_1="First role to ping",
     role_2="Second role to ping",
     role_3="Third role to ping"
@@ -344,90 +234,39 @@ async def rules(
     role_2: discord.Role = None,
     role_3: discord.Role = None
 ):
-
-    formatted_rules = rules.replace("\\n", "\n")
-
     embed = discord.Embed(
-        title=f"{title}",
-        description=formatted_rules,
-        color=discord.Color.from_rgb(88, 101, 242)
+        title=title,
+        description=rules.replace("\\n", "\n"),
+        color=COLORS["rules"]
     )
 
-    embed.add_field(
-        name="Server",
-        value=interaction.guild.name,
-        inline=True
-    )
-
-    embed.add_field(
-        name="Category",
-        value="Community Rules",
-        inline=True
-    )
-
-    embed.add_field(
-        name="Status",
-        value="Active",
-        inline=True
-    )
+    embed.add_field(name="Server", value=interaction.guild.name, inline=True)
+    embed.add_field(name="Category", value="Community Rules", inline=True)
+    embed.add_field(name="Status", value="Active", inline=True)
 
     if interaction.guild.icon:
         embed.set_thumbnail(url=interaction.guild.icon.url)
 
-    embed.set_footer(
-        text=f"Published by {interaction.user.name}"
-    )
-
+    embed.set_footer(text=f"Published by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
-    # Role Pings
-    roles_to_ping = []
+    ping_message = get_ping_message(role_1, role_2, role_3)
 
-    for role in [role_1, role_2, role_3]:
-        if role and role not in roles_to_ping:
-            roles_to_ping.append(role)
-
-    ping_message = " ".join(role.mention for role in roles_to_ping)
-
-    await interaction.response.send_message(
-        "Server rules published successfully.",
-        ephemeral=True
-    )
+    await interaction.response.send_message("Server rules published successfully.", ephemeral=True)
 
     if ping_message:
-        await interaction.channel.send(
-            content=ping_message,
-            embed=embed
-        )
+        await interaction.channel.send(content=ping_message, embed=embed)
     else:
         await interaction.channel.send(embed=embed)
 
 # =========================================================
-# Add To Error Handler
-# =========================================================
-@rules.error
-async def rules_error(
-    interaction: discord.Interaction,
-    error: app_commands.AppCommandError
-):
-
-    if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message(
-            "You do not have permission to use this command.",
-            ephemeral=True
-        )
-
-# =========================================================
-# Permission Error Handler
+# Error Handler
 # =========================================================
 @update.error
 @showcase.error
 @status.error
-async def permission_error(
-    interaction: discord.Interaction,
-    error: app_commands.AppCommandError
-):
-
+@rules.error
+async def permission_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.MissingPermissions):
         await interaction.response.send_message(
             "You do not have permission to use this command.",
@@ -435,7 +274,7 @@ async def permission_error(
         )
 
 # =========================================================
-# Start Services
+# Start Bot
 # =========================================================
 keep_alive()
 
