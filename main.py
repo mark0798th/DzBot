@@ -90,6 +90,55 @@ async def on_ready():
     )
 
 # =========================================================
+# BAN COMMAND
+# =========================================================
+ALLOWED_BAN_ROLES = [
+    "Administrator",
+    "Moderator",
+    "Developer",
+    "Staff"
+]
+
+@bot.tree.command(name="ban", description="Ban a member from the server")
+@app_commands.describe(
+    member="Member to ban",
+    reason="Reason for the ban"
+)
+async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    user_roles = [role.name for role in interaction.user.roles]
+
+    if not any(role in ALLOWED_BAN_ROLES for role in user_roles):
+        return await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True
+        )
+
+    if member.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
+        return await interaction.response.send_message(
+            "You cannot ban this member.",
+            ephemeral=True
+        )
+
+    embed = discord.Embed(
+        title="Member Banned",
+        description=f"{member.mention} has been banned from the server.",
+        color=discord.Color.red()
+    )
+
+    embed.add_field(name="Member", value=f"{member} ({member.id})", inline=False)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Reason", value=reason, inline=True)
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Banned by {interaction.user.name}")
+    embed.timestamp = discord.utils.utcnow()
+
+    await member.ban(reason=reason)
+
+    await interaction.response.send_message("Member banned successfully.", ephemeral=True)
+    await interaction.channel.send(embed=embed)
+
+# =========================================================
 # DEVLOG COMMAND
 # =========================================================
 @bot.tree.command(name="devlog", description="Post development progress or changes")
