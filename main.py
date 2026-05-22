@@ -90,6 +90,93 @@ async def on_ready():
     )
 
 # =========================================================
+# POLL COMMAND
+# =========================================================
+import asyncio
+
+@bot.tree.command(name="poll", description="Create a community poll")
+@app_commands.describe(
+    question="Poll question",
+    options="Choices separated with |",
+    duration="Poll duration in minutes",
+    role_1="First role to ping",
+    role_2="Second role to ping",
+    role_3="Third role to ping"
+)
+@app_commands.checks.has_permissions(manage_messages=True)
+async def poll(
+    interaction: discord.Interaction,
+    question: str,
+    options: str,
+    duration: int,
+    role_1: discord.Role = None,
+    role_2: discord.Role = None,
+    role_3: discord.Role = None
+):
+    choices = [choice.strip() for choice in options.split("|")]
+
+    if len(choices) < 2:
+        return await interaction.response.send_message(
+            "A poll must have at least 2 options.",
+            ephemeral=True
+        )
+
+    if len(choices) > 10:
+        return await interaction.response.send_message(
+            "Polls can only have up to 10 options.",
+            ephemeral=True
+        )
+
+    reactions = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    description = ""
+
+    for i, choice in enumerate(choices):
+        description += f"{reactions[i]} {choice}\n"
+
+    embed = discord.Embed(
+        title="Community Poll",
+        description=f"## {question}\n\n{description}",
+        color=discord.Color.from_rgb(88, 101, 242)
+    )
+
+    embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
+    embed.add_field(name="Options", value=str(len(choices)), inline=True)
+    embed.add_field(name="Status", value="Voting Open", inline=True)
+
+    embed.set_footer(text=f"Poll created by {interaction.user.name}")
+    embed.timestamp = discord.utils.utcnow()
+
+    ping_message = get_ping_message(role_1, role_2, role_3)
+
+    await interaction.response.send_message(
+        "Poll created successfully.",
+        ephemeral=True
+    )
+
+    if ping_message:
+        message = await interaction.channel.send(content=ping_message, embed=embed)
+    else:
+        message = await interaction.channel.send(embed=embed)
+
+    for i in range(len(choices)):
+        await message.add_reaction(reactions[i])
+
+    await asyncio.sleep(duration * 60)
+
+    updated_embed = message.embeds[0]
+    updated_embed.color = discord.Color.dark_grey()
+
+    updated_embed.set_field_at(
+        2,
+        name="Status",
+        value="Voting Closed",
+        inline=True
+    )
+
+    await message.edit(embed=updated_embed)
+
+# =========================================================
 # BAN COMMAND
 # =========================================================
 ALLOWED_BAN_ROLES = [
