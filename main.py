@@ -93,10 +93,8 @@ async def on_ready():
 # BAN COMMAND
 # =========================================================
 ALLOWED_BAN_ROLES = [
-    "Administrator",
-    "Moderator",
-    "Developer",
-    "Staff"
+    "DeadZone HR",
+    "Head Moderator"
 ]
 
 @bot.tree.command(name="ban", description="Ban a member from the server")
