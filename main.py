@@ -85,7 +85,7 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
-            name="DeadZone Development"
+            name="My name is DeadZone UwU"
         )
     )
 
@@ -140,10 +140,6 @@ async def poll(
         color=discord.Color.from_rgb(88, 101, 242)
     )
 
-    embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
-    embed.add_field(name="Options", value=str(len(choices)), inline=True)
-    embed.add_field(name="Status", value="Voting Open", inline=True)
-
     embed.set_footer(text=f"Poll created by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
@@ -166,13 +162,6 @@ async def poll(
 
     updated_embed = message.embeds[0]
     updated_embed.color = discord.Color.dark_grey()
-
-    updated_embed.set_field_at(
-        2,
-        name="Status",
-        value="Voting Closed",
-        inline=True
-    )
 
     await message.edit(embed=updated_embed)
 
