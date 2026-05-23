@@ -446,6 +446,40 @@ async def permission_error(interaction: discord.Interaction, error: app_commands
 # =========================================================
 keep_alive()
 
+# =========================================================
+# MEMBER JOIN EVENT
+# =========================================================
+WELCOME_CHANNEL_ID = 948801995907678261
+RULES_CHANNEL_URL = "https://discord.com/channels/948801995907678259/948810517852610611"
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+
+    if not channel:
+        return
+
+    embed = discord.Embed(
+        title="Welcome to DeadZone",
+        description=(
+            f"Welcome {member.mention} to the server.\n\n"
+            f"Please read the server rules before chatting:\n"
+            f"{RULES_CHANNEL_URL}"
+        ),
+        color=discord.Color.from_rgb(88, 101, 242)
+    )
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+
+    if member.guild.icon:
+        embed.set_image(url=member.guild.icon.url)
+
+    embed.set_footer(text="DeadZone Community")
+    embed.timestamp = discord.utils.utcnow()
+
+    await channel.send(content=member.mention, embed=embed)
+
+
 TOKEN = os.environ.get("DISCORD_TOKEN")
 
 if TOKEN:
