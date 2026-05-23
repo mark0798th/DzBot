@@ -168,7 +168,7 @@ async def poll(
 # =========================================================
 # BAN COMMAND
 # =========================================================
-ALLOWED_BAN_ROLES = [
+ALLOWED_ROLES = [
     "DeadZone HR",
     "Head Moderator"
 ]
@@ -211,6 +211,91 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
 
     await interaction.response.send_message("Member banned successfully.", ephemeral=True)
     await interaction.channel.send(embed=embed)
+    
+    # =========================================================
+# KICK COMMAND
+# =========================================================
+
+@bot.tree.command(name="kick", description="Kick a member from the server")
+@app_commands.describe(
+    member="Member to kick",
+    reason="Reason for the kick"
+)
+async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+    user_roles = [role.name for role in interaction.user.roles]
+
+    if not any(role in ALLOWED_ROLES for role in user_roles):
+        return await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True
+        )
+
+    if member.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
+        return await interaction.response.send_message(
+            "You cannot kick this member.",
+            ephemeral=True
+        )
+
+    embed = discord.Embed(
+        title="Member Kicked",
+        description=f"{member.mention} has been kicked from the server.",
+        color=discord.Color.orange()
+    )
+
+    embed.add_field(name="Member", value=f"{member} ({member.id})", inline=False)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Reason", value=reason, inline=True)
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"Kicked by {interaction.user.name}")
+    embed.timestamp = discord.utils.utcnow()
+
+    await member.kick(reason=reason)
+
+    await interaction.response.send_message("Member kicked successfully.", ephemeral=True)
+    await interaction.channel.send(embed=embed)
+
+# =========================================================
+# UNBAN COMMAND
+# =========================================================
+@bot.tree.command(name="unban", description="Unban a user from the server")
+@app_commands.describe(
+    user_id="User ID to unban"
+)
+async def unban(interaction: discord.Interaction, user_id: str):
+    user_roles = [role.name for role in interaction.user.roles]
+
+    if not any(role in ALLOWED_ROLES for role in user_roles):
+        return await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True
+        )
+
+    try:
+        user = await bot.fetch_user(int(user_id))
+        await interaction.guild.unban(user)
+
+        embed = discord.Embed(
+            title="Member Unbanned",
+            description=f"{user.mention} has been unbanned.",
+            color=discord.Color.green()
+        )
+
+        embed.add_field(name="User", value=f"{user} ({user.id})", inline=False)
+        embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.set_footer(text=f"Unbanned by {interaction.user.name}")
+        embed.timestamp = discord.utils.utcnow()
+
+        await interaction.response.send_message("Member unbanned successfully.", ephemeral=True)
+        await interaction.channel.send(embed=embed)
+
+    except:
+        await interaction.response.send_message(
+            "Failed to unban user. Invalid ID or user is not banned.",
+            ephemeral=True
+        )
 
 # =========================================================
 # DEVLOG COMMAND
@@ -447,6 +532,28 @@ async def permission_error(interaction: discord.Interaction, error: app_commands
 keep_alive()
 
 # =========================================================
+# MEMBER LEAVE EVENT
+# =========================================================
+@bot.event
+async def on_member_remove(member: discord.Member):
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+
+    if not channel:
+        return
+
+    embed = discord.Embed(
+        title="Member Left",
+        description=f"{member} has left the server.",
+        color=discord.Color.from_rgb(240, 71, 71)
+    )
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text="DeadZone Community")
+    embed.timestamp = discord.utils.utcnow()
+
+    await channel.send(embed=embed)
+
+# =========================================================
 # MEMBER JOIN EVENT
 # =========================================================
 WELCOME_CHANNEL_ID = 948801995907678261
@@ -479,6 +586,28 @@ async def on_member_join(member: discord.Member):
 
     await channel.send(content=member.mention, embed=embed)
 
+# =========================================================
+# MEMBER LEAVE EVENT
+# =========================================================
+@bot.event
+async def on_member_remove(member: discord.Member):
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
+
+    if not channel:
+        return
+
+    embed = discord.Embed(
+        title="Member Left",
+        description=f"{member} has left the server.",
+        color=discord.Color.from_rgb(240, 71, 71)
+    )
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text="DeadZone Community")
+    embed.timestamp = discord.utils.utcnow()
+
+    await channel.send(embed=embed)
+    
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 
