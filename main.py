@@ -85,7 +85,7 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
-            name="My name is DeadZone UwU"
+            name="Playing DeadZone"
         )
     )
 
@@ -567,7 +567,7 @@ async def on_member_join(member: discord.Member):
         return
 
     embed = discord.Embed(
-        title="Welcome to DeadZone",
+        title="Welcome to DeadZone Server Community",
         description=(
             f"Welcome {member.mention} to the server.\n\n"
             f"Please read the server rules before chatting:\n"
