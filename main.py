@@ -181,7 +181,7 @@ ALLOWED_ROLES = [
 async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
     user_roles = [role.name for role in interaction.user.roles]
 
-    if not any(role in ALLOWED_BAN_ROLES for role in user_roles):
+    if not any(role in ALLOWED_ROLES for role in user_roles):
         return await interaction.response.send_message(
             "You do not have permission to use this command.",
             ephemeral=True
