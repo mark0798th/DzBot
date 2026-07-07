@@ -1,8 +1,10 @@
 import os
+import asyncio
 import discord
 from discord import app_commands
 from flask import Flask
 from threading import Thread
+from mcrcon import MCRcon
 
 # =========================================================
 # Render Keep Alive
@@ -18,6 +20,34 @@ def run_web():
 
 def keep_alive():
     Thread(target=run_web).start()
+
+# =========================================================
+# Minecraft RCON Config
+# =========================================================
+# host/port มาจากเซิร์ฟเวอร์ของคุณ (th1.xd.in.th : 24790)
+# ส่วนรหัสผ่าน RCON ต้องตั้งเป็น Environment Variable ชื่อ MCRCON_PASSWORD
+# (ห้ามใส่รหัสผ่านตรงๆ ในโค้ด)
+MCRCON_HOST = os.environ.get("MCRCON_HOST", "th1.xd.in.th")
+MCRCON_PORT = int(os.environ.get("MCRCON_PORT", "24790"))
+MCRCON_PASSWORD = os.environ.get("MCRCON_PASSWORD")
+
+def _rcon_command_sync(command: str) -> str:
+    """ฟังก์ชัน sync ที่ยิงคำสั่งไปที่เซิร์ฟเวอร์ Minecraft ผ่าน RCON"""
+    with MCRcon(MCRCON_HOST, MCRCON_PASSWORD, port=MCRCON_PORT) as mcr:
+        response = mcr.command(command)
+        return response
+
+async def send_mc_command(command: str) -> str | None:
+    """เวอร์ชัน async สำหรับเรียกใช้ใน discord.py โดยไม่บล็อค event loop"""
+    if not MCRCON_PASSWORD:
+        print("MCRCON_PASSWORD is not set in environment variables.")
+        return None
+    try:
+        result = await asyncio.to_thread(_rcon_command_sync, command)
+        return result
+    except Exception as e:
+        print(f"RCON command failed: {e}")
+        return None
 
 # =========================================================
 # Discord Bot Setup
@@ -92,8 +122,6 @@ async def on_ready():
 # =========================================================
 # POLL COMMAND
 # =========================================================
-import asyncio
-
 @bot.tree.command(name="poll", description="Create a community poll")
 @app_commands.describe(
     question="Poll question",
@@ -166,19 +194,25 @@ async def poll(
     await message.edit(embed=updated_embed)
 
 # =========================================================
-# BAN COMMAND
+# BAN COMMAND (Discord + Minecraft ผ่าน RCON)
 # =========================================================
 ALLOWED_ROLES = [
     "DeadZone HR",
     "Head Moderator"
 ]
 
-@bot.tree.command(name="ban", description="Ban a member from the server")
+@bot.tree.command(name="ban", description="Ban a member from the server (and optionally the Minecraft server)")
 @app_commands.describe(
     member="Member to ban",
-    reason="Reason for the ban"
+    reason="Reason for the ban",
+    mc_username="ชื่อผู้เล่นในเกม Minecraft (ถ้าต้องการแบนในเซิร์ฟเวอร์ด้วย)"
 )
-async def ban(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+async def ban(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    reason: str = "No reason provided",
+    mc_username: str = None
+):
     user_roles = [role.name for role in interaction.user.roles]
 
     if not any(role in ALLOWED_ROLES for role in user_roles):
@@ -193,6 +227,20 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
             ephemeral=True
         )
 
+    await interaction.response.defer(ephemeral=True)
+
+    # --- แบนออกจาก Discord ---
+    await member.ban(reason=reason)
+
+    # --- แบนในเซิร์ฟเวอร์ Minecraft ผ่าน RCON (ถ้ามีการกรอกชื่อในเกม) ---
+    mc_status_text = "ไม่ได้ระบุชื่อในเกม (ข้ามการแบนในเซิร์ฟเวอร์)"
+    if mc_username:
+        result = await send_mc_command(f"ban {mc_username} {reason}")
+        if result is not None:
+            mc_status_text = f"แบนในเซิร์ฟเวอร์ Minecraft สำเร็จ ({mc_username})"
+        else:
+            mc_status_text = f"แบนในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username}) — ตรวจสอบ RCON connection/password"
+
     embed = discord.Embed(
         title="Member Banned",
         description=f"{member.mention} has been banned from the server.",
@@ -202,26 +250,30 @@ async def ban(interaction: discord.Interaction, member: discord.Member, reason: 
     embed.add_field(name="Member", value=f"{member} ({member.id})", inline=False)
     embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
     embed.add_field(name="Reason", value=reason, inline=True)
+    embed.add_field(name="Minecraft Server", value=mc_status_text, inline=False)
 
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.set_footer(text=f"Banned by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
-    await member.ban(reason=reason)
-
-    await interaction.response.send_message("Member banned successfully.", ephemeral=True)
+    await interaction.followup.send("Member banned successfully.", ephemeral=True)
     await interaction.channel.send(embed=embed)
-    
-    # =========================================================
-# KICK COMMAND
-# =========================================================
 
-@bot.tree.command(name="kick", description="Kick a member from the server")
+# =========================================================
+# KICK COMMAND (Discord + Minecraft ผ่าน RCON)
+# =========================================================
+@bot.tree.command(name="kick", description="Kick a member from the server (and optionally the Minecraft server)")
 @app_commands.describe(
     member="Member to kick",
-    reason="Reason for the kick"
+    reason="Reason for the kick",
+    mc_username="ชื่อผู้เล่นในเกม Minecraft (ถ้าต้องการเตะออกจากเซิร์ฟเวอร์ด้วย)"
 )
-async def kick(interaction: discord.Interaction, member: discord.Member, reason: str = "No reason provided"):
+async def kick(
+    interaction: discord.Interaction,
+    member: discord.Member,
+    reason: str = "No reason provided",
+    mc_username: str = None
+):
     user_roles = [role.name for role in interaction.user.roles]
 
     if not any(role in ALLOWED_ROLES for role in user_roles):
@@ -236,6 +288,20 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
             ephemeral=True
         )
 
+    await interaction.response.defer(ephemeral=True)
+
+    # --- เตะออกจาก Discord ---
+    await member.kick(reason=reason)
+
+    # --- เตะออกจากเซิร์ฟเวอร์ Minecraft ผ่าน RCON (ถ้ามีการกรอกชื่อในเกม) ---
+    mc_status_text = "ไม่ได้ระบุชื่อในเกม (ข้ามการเตะในเซิร์ฟเวอร์)"
+    if mc_username:
+        result = await send_mc_command(f"kick {mc_username} {reason}")
+        if result is not None:
+            mc_status_text = f"เตะออกจากเซิร์ฟเวอร์ Minecraft สำเร็จ ({mc_username})"
+        else:
+            mc_status_text = f"เตะออกจากเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username}) — ตรวจสอบ RCON connection/password"
+
     embed = discord.Embed(
         title="Member Kicked",
         description=f"{member.mention} has been kicked from the server.",
@@ -245,24 +311,24 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
     embed.add_field(name="Member", value=f"{member} ({member.id})", inline=False)
     embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
     embed.add_field(name="Reason", value=reason, inline=True)
+    embed.add_field(name="Minecraft Server", value=mc_status_text, inline=False)
 
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.set_footer(text=f"Kicked by {interaction.user.name}")
     embed.timestamp = discord.utils.utcnow()
 
-    await member.kick(reason=reason)
-
-    await interaction.response.send_message("Member kicked successfully.", ephemeral=True)
+    await interaction.followup.send("Member kicked successfully.", ephemeral=True)
     await interaction.channel.send(embed=embed)
 
 # =========================================================
-# UNBAN COMMAND
+# UNBAN COMMAND (Discord + Minecraft ผ่าน RCON)
 # =========================================================
 @bot.tree.command(name="unban", description="Unban a user from the server")
 @app_commands.describe(
-    user_id="User ID to unban"
+    user_id="User ID to unban",
+    mc_username="ชื่อผู้เล่นในเกม Minecraft (ถ้าต้องการปลดแบนในเซิร์ฟเวอร์ด้วย)"
 )
-async def unban(interaction: discord.Interaction, user_id: str):
+async def unban(interaction: discord.Interaction, user_id: str, mc_username: str = None):
     user_roles = [role.name for role in interaction.user.roles]
 
     if not any(role in ALLOWED_ROLES for role in user_roles):
@@ -275,6 +341,14 @@ async def unban(interaction: discord.Interaction, user_id: str):
         user = await bot.fetch_user(int(user_id))
         await interaction.guild.unban(user)
 
+        mc_status_text = "ไม่ได้ระบุชื่อในเกม (ข้ามการปลดแบนในเซิร์ฟเวอร์)"
+        if mc_username:
+            result = await send_mc_command(f"pardon {mc_username}")
+            if result is not None:
+                mc_status_text = f"ปลดแบนในเซิร์ฟเวอร์ Minecraft สำเร็จ ({mc_username})"
+            else:
+                mc_status_text = f"ปลดแบนในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username})"
+
         embed = discord.Embed(
             title="Member Unbanned",
             description=f"{user.mention} has been unbanned.",
@@ -283,6 +357,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
 
         embed.add_field(name="User", value=f"{user} ({user.id})", inline=False)
         embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+        embed.add_field(name="Minecraft Server", value=mc_status_text, inline=False)
 
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_footer(text=f"Unbanned by {interaction.user.name}")
@@ -291,7 +366,7 @@ async def unban(interaction: discord.Interaction, user_id: str):
         await interaction.response.send_message("Member unbanned successfully.", ephemeral=True)
         await interaction.channel.send(embed=embed)
 
-    except:
+    except Exception:
         await interaction.response.send_message(
             "Failed to unban user. Invalid ID or user is not banned.",
             ephemeral=True
@@ -383,7 +458,7 @@ async def update(
 ):
     embed = discord.Embed(
         title=f"DeadZone Update {version}",
-        description=f"## {title}\n\n{details.replace('\\n', '\n')}",
+        description=f"## {title}\n\n{details.replace(chr(92)+'n', chr(10))}",
         color=COLORS["update"]
     )
 
@@ -527,33 +602,6 @@ async def permission_error(interaction: discord.Interaction, error: app_commands
         )
 
 # =========================================================
-# Start Bot
-# =========================================================
-keep_alive()
-
-# =========================================================
-# MEMBER LEAVE EVENT
-# =========================================================
-@bot.event
-async def on_member_remove(member: discord.Member):
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
-
-    if not channel:
-        return
-
-    embed = discord.Embed(
-        title="Member Left",
-        description=f"{member} has left the server.",
-        color=discord.Color.from_rgb(240, 71, 71)
-    )
-
-    embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text="DeadZone Community")
-    embed.timestamp = discord.utils.utcnow()
-
-    await channel.send(embed=embed)
-
-# =========================================================
 # MEMBER JOIN EVENT
 # =========================================================
 WELCOME_CHANNEL_ID = 948801995907678261
@@ -607,7 +655,11 @@ async def on_member_remove(member: discord.Member):
     embed.timestamp = discord.utils.utcnow()
 
     await channel.send(embed=embed)
-    
+
+# =========================================================
+# Start Bot
+# =========================================================
+keep_alive()
 
 TOKEN = os.environ.get("DISCORD_TOKEN")
 
