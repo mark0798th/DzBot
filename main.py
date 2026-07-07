@@ -373,6 +373,92 @@ async def unban(interaction: discord.Interaction, user_id: str, mc_username: str
         )
 
 # =========================================================
+# MCBAN COMMAND (แบนเฉพาะในเซิร์ฟเวอร์ Minecraft ผ่าน RCON)
+# =========================================================
+@bot.tree.command(name="mcban", description="Ban a player from the Minecraft server only (RCON)")
+@app_commands.describe(
+    mc_username="ชื่อผู้เล่นในเกม Minecraft ที่ต้องการแบน",
+    reason="เหตุผลในการแบน"
+)
+async def mcban(interaction: discord.Interaction, mc_username: str, reason: str = "No reason provided"):
+    user_roles = [role.name for role in interaction.user.roles]
+
+    if not any(role in ALLOWED_ROLES for role in user_roles):
+        return await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True
+        )
+
+    await interaction.response.defer(ephemeral=True)
+
+    result = await send_mc_command(f"ban {mc_username} {reason}")
+
+    if result is None:
+        return await interaction.followup.send(
+            f"แบน `{mc_username}` ในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ — ตรวจสอบ RCON connection/password",
+            ephemeral=True
+        )
+
+    embed = discord.Embed(
+        title="Minecraft Player Banned",
+        description=f"`{mc_username}` has been banned from the Minecraft server.",
+        color=discord.Color.red()
+    )
+
+    embed.add_field(name="Player", value=mc_username, inline=True)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+    embed.add_field(name="Reason", value=reason, inline=False)
+
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    embed.set_footer(text=f"Banned by {interaction.user.name}")
+    embed.timestamp = discord.utils.utcnow()
+
+    await interaction.followup.send("Minecraft ban executed successfully.", ephemeral=True)
+    await interaction.channel.send(embed=embed)
+
+# =========================================================
+# MCUNBAN COMMAND (ปลดแบนเฉพาะในเซิร์ฟเวอร์ Minecraft ผ่าน RCON)
+# =========================================================
+@bot.tree.command(name="mcunban", description="Unban a player from the Minecraft server only (RCON)")
+@app_commands.describe(
+    mc_username="ชื่อผู้เล่นในเกม Minecraft ที่ต้องการปลดแบน"
+)
+async def mcunban(interaction: discord.Interaction, mc_username: str):
+    user_roles = [role.name for role in interaction.user.roles]
+
+    if not any(role in ALLOWED_ROLES for role in user_roles):
+        return await interaction.response.send_message(
+            "You do not have permission to use this command.",
+            ephemeral=True
+        )
+
+    await interaction.response.defer(ephemeral=True)
+
+    result = await send_mc_command(f"pardon {mc_username}")
+
+    if result is None:
+        return await interaction.followup.send(
+            f"ปลดแบน `{mc_username}` ในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ — ตรวจสอบ RCON connection/password",
+            ephemeral=True
+        )
+
+    embed = discord.Embed(
+        title="Minecraft Player Unbanned",
+        description=f"`{mc_username}` has been unbanned from the Minecraft server.",
+        color=discord.Color.green()
+    )
+
+    embed.add_field(name="Player", value=mc_username, inline=True)
+    embed.add_field(name="Moderator", value=interaction.user.mention, inline=True)
+
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    embed.set_footer(text=f"Unbanned by {interaction.user.name}")
+    embed.timestamp = discord.utils.utcnow()
+
+    await interaction.followup.send("Minecraft unban executed successfully.", ephemeral=True)
+    await interaction.channel.send(embed=embed)
+
+# =========================================================
 # DEVLOG COMMAND
 # =========================================================
 @bot.tree.command(name="devlog", description="Post development progress or changes")
