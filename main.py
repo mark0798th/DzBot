@@ -28,26 +28,43 @@ def keep_alive():
 # ส่วนรหัสผ่าน RCON ต้องตั้งเป็น Environment Variable ชื่อ MCRCON_PASSWORD
 # (ห้ามใส่รหัสผ่านตรงๆ ในโค้ด)
 MCRCON_HOST = os.environ.get("MCRCON_HOST", "th1.xd.in.th")
-MCRCON_PORT = int(os.environ.get("MCRCON_PORT", "24790"))
+MCRCON_PORT = int(os.environ.get("MCRCON_PORT", "25575"))
 MCRCON_PASSWORD = os.environ.get("MCRCON_PASSWORD")
 
 def _rcon_command_sync(command: str) -> str:
     """ฟังก์ชัน sync ที่ยิงคำสั่งไปที่เซิร์ฟเวอร์ Minecraft ผ่าน RCON"""
-    with MCRcon(MCRCON_HOST, MCRCON_PASSWORD, port=MCRCON_PORT) as mcr:
+    with MCRcon(MCRCON_HOST, MCRCON_PASSWORD, port=MCRCON_PORT, timeout=10) as mcr:
         response = mcr.command(command)
         return response
 
-async def send_mc_command(command: str) -> str | None:
-    """เวอร์ชัน async สำหรับเรียกใช้ใน discord.py โดยไม่บล็อค event loop"""
+async def send_mc_command(command: str) -> tuple[bool, str]:
+    """
+    เวอร์ชัน async สำหรับเรียกใช้ใน discord.py โดยไม่บล็อค event loop
+    คืนค่าเป็น (สำเร็จหรือไม่, ข้อความผลลัพธ์หรือสาเหตุที่ผิดพลาด)
+    """
     if not MCRCON_PASSWORD:
-        print("MCRCON_PASSWORD is not set in environment variables.")
-        return None
+        error_msg = "ยังไม่ได้ตั้งค่า MCRCON_PASSWORD ใน Environment Variables"
+        print(error_msg)
+        return False, error_msg
     try:
         result = await asyncio.to_thread(_rcon_command_sync, command)
-        return result
+        return True, result
+    except ConnectionRefusedError:
+        error_msg = f"เชื่อมต่อ {MCRCON_HOST}:{MCRCON_PORT} ไม่ได้ (Connection refused) — RCON อาจยังไม่เปิด หรือพอร์ตปิดอยู่"
+        print(f"RCON command failed: {error_msg}")
+        return False, error_msg
+    except TimeoutError:
+        error_msg = f"เชื่อมต่อ {MCRCON_HOST}:{MCRCON_PORT} หมดเวลา (Timeout) — เช็ค Firewall/Allocation ของพอร์ตนี้"
+        print(f"RCON command failed: {error_msg}")
+        return False, error_msg
     except Exception as e:
-        print(f"RCON command failed: {e}")
-        return None
+        error_text = str(e)
+        if "auth" in error_text.lower() or "login" in error_text.lower():
+            error_msg = "รหัสผ่าน RCON ไม่ถูกต้อง (Authentication failed) — เช็ค MCRCON_PASSWORD ให้ตรงกับ rcon.password ใน server.properties"
+        else:
+            error_msg = f"เกิดข้อผิดพลาด: {error_text}"
+        print(f"RCON command failed: {error_msg}")
+        return False, error_msg
 
 # =========================================================
 # Discord Bot Setup
@@ -235,11 +252,11 @@ async def ban(
     # --- แบนในเซิร์ฟเวอร์ Minecraft ผ่าน RCON (ถ้ามีการกรอกชื่อในเกม) ---
     mc_status_text = "ไม่ได้ระบุชื่อในเกม (ข้ามการแบนในเซิร์ฟเวอร์)"
     if mc_username:
-        result = await send_mc_command(f"ban {mc_username} {reason}")
-        if result is not None:
+        success, info = await send_mc_command(f"ban {mc_username} {reason}")
+        if success:
             mc_status_text = f"แบนในเซิร์ฟเวอร์ Minecraft สำเร็จ ({mc_username})"
         else:
-            mc_status_text = f"แบนในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username}) — ตรวจสอบ RCON connection/password"
+            mc_status_text = f"แบนในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username})\n{info}"
 
     embed = discord.Embed(
         title="Member Banned",
@@ -296,11 +313,11 @@ async def kick(
     # --- เตะออกจากเซิร์ฟเวอร์ Minecraft ผ่าน RCON (ถ้ามีการกรอกชื่อในเกม) ---
     mc_status_text = "ไม่ได้ระบุชื่อในเกม (ข้ามการเตะในเซิร์ฟเวอร์)"
     if mc_username:
-        result = await send_mc_command(f"kick {mc_username} {reason}")
-        if result is not None:
+        success, info = await send_mc_command(f"kick {mc_username} {reason}")
+        if success:
             mc_status_text = f"เตะออกจากเซิร์ฟเวอร์ Minecraft สำเร็จ ({mc_username})"
         else:
-            mc_status_text = f"เตะออกจากเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username}) — ตรวจสอบ RCON connection/password"
+            mc_status_text = f"เตะออกจากเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username})\n{info}"
 
     embed = discord.Embed(
         title="Member Kicked",
@@ -343,11 +360,11 @@ async def unban(interaction: discord.Interaction, user_id: str, mc_username: str
 
         mc_status_text = "ไม่ได้ระบุชื่อในเกม (ข้ามการปลดแบนในเซิร์ฟเวอร์)"
         if mc_username:
-            result = await send_mc_command(f"pardon {mc_username}")
-            if result is not None:
+            success, info = await send_mc_command(f"pardon {mc_username}")
+            if success:
                 mc_status_text = f"ปลดแบนในเซิร์ฟเวอร์ Minecraft สำเร็จ ({mc_username})"
             else:
-                mc_status_text = f"ปลดแบนในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username})"
+                mc_status_text = f"ปลดแบนในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ ({mc_username})\n{info}"
 
         embed = discord.Embed(
             title="Member Unbanned",
@@ -391,11 +408,11 @@ async def mcban(interaction: discord.Interaction, mc_username: str, reason: str 
 
     await interaction.response.defer(ephemeral=True)
 
-    result = await send_mc_command(f"ban {mc_username} {reason}")
+    success, info = await send_mc_command(f"ban {mc_username} {reason}")
 
-    if result is None:
+    if not success:
         return await interaction.followup.send(
-            f"แบน `{mc_username}` ในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ — ตรวจสอบ RCON connection/password",
+            f"แบน `{mc_username}` ในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ\n{info}",
             ephemeral=True
         )
 
@@ -434,11 +451,11 @@ async def mcunban(interaction: discord.Interaction, mc_username: str):
 
     await interaction.response.defer(ephemeral=True)
 
-    result = await send_mc_command(f"pardon {mc_username}")
+    success, info = await send_mc_command(f"pardon {mc_username}")
 
-    if result is None:
+    if not success:
         return await interaction.followup.send(
-            f"ปลดแบน `{mc_username}` ในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ — ตรวจสอบ RCON connection/password",
+            f"ปลดแบน `{mc_username}` ในเซิร์ฟเวอร์ Minecraft ไม่สำเร็จ\n{info}",
             ephemeral=True
         )
 
