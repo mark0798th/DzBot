@@ -1,4 +1,4 @@
 discord.py
 Flask
 gunicorn
-pip install mcrcon
+mcrcon
